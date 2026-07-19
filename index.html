@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Control de Horas Extras</title>
+<meta name="theme-color" content="#0a0e17">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Horas Extras">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<style>
+  :root{
+    --bg:#0a0e17;
+    --card:#131a2b;
+    --card-2:#0f1522;
+    --border:rgba(255,255,255,.08);
+    --border-strong:rgba(255,255,255,.16);
+    --text:#f5f7fa;
+    --muted:#8b93a7;
+    --primary:#e5171f;
+    --primary-light:#ff3b44;
+    --accent:#22d3ee;
+    --success:#10dc82;
+    --warn:#f97316;
+    --danger:#f43f5e;
+    --purple:#a855f7;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    padding-bottom:30px;
+    -webkit-tap-highlight-color:transparent;
+  }
+  header{
+    background:linear-gradient(135deg,var(--card-2),var(--card));
+    border-bottom:1px solid var(--border);
+    color:#fff;
+    padding:16px 16px 20px;
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  header .top-row{display:flex; justify-content:space-between; align-items:center;}
+  header .brand{display:flex; align-items:center; gap:10px;}
+  header .logo-mark{width:34px; height:34px; border-radius:9px; flex-shrink:0;}
+  header h1{font-size:17px; margin:0; font-weight:700; letter-spacing:.01em;}
+  header .app-sub{font-size:10.5px; color:var(--accent); text-transform:uppercase; letter-spacing:.06em; margin-top:1px;}
+  header .emp-name{font-size:12.5px; color:var(--muted); margin-top:2px;}
+  .icon-btn{
+    background:rgba(255,255,255,.06);
+    border:1px solid var(--border); color:#fff; width:36px; height:36px;
+    border-radius:50%; font-size:16px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  main{padding:14px; max-width:520px; margin:0 auto;}
+  .summary{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:-14px; margin-bottom:16px;}
+  .summary .card{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px; text-align:center;}
+  .summary .card .num{font-size:22px; font-weight:700; color:var(--text);}
+  .summary .card .lbl{font-size:10.5px; color:var(--accent); text-transform:uppercase; letter-spacing:.03em; margin-top:4px;}
+
+  .turno-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:20px;
+    text-align:center;
+    margin-bottom:18px;
+  }
+  .turno-card .estado-txt{font-size:12.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; margin-bottom:14px;}
+  .turno-card .crono{font-size:30px; font-weight:700; color:var(--accent); margin-bottom:16px; font-variant-numeric:tabular-nums;}
+  .big-btn{
+    width:100%;
+    padding:16px;
+    border-radius:14px;
+    border:none;
+    font-size:16px;
+    font-weight:700;
+    color:#04140f;
+  }
+  .big-btn.start{background:var(--success);}
+  .big-btn.end{background:var(--danger); color:#fff;}
+  .big-btn:disabled{opacity:.5;}
+  .status-line{font-size:12.5px; color:var(--muted); margin-top:10px; min-height:16px;}
+
+  .section-title{font-size:12.5px; font-weight:600; color:var(--purple); text-transform:uppercase; letter-spacing:.05em; margin:18px 4px 8px;}
+  .entry{
+    background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:8px;
+  }
+  .entry .top{display:flex; justify-content:space-between; align-items:center;}
+  .entry .fecha{font-weight:600; font-size:14px;}
+  .entry .horas{font-weight:700; color:var(--accent); font-size:15px; white-space:nowrap;}
+  .entry .detalle{font-size:12.5px; color:var(--muted); margin-top:3px;}
+  .badge{
+    display:inline-block; font-size:11px; font-weight:700; padding:3px 9px;
+    border-radius:20px; margin-top:6px;
+  }
+  .badge.pendiente{background:rgba(249,115,22,.15); color:var(--warn);}
+  .badge.aprobado{background:rgba(16,220,130,.15); color:var(--success);}
+  .badge.rechazado{background:rgba(244,63,94,.15); color:var(--danger);}
+  .badge.en_curso{background:rgba(34,211,238,.15); color:var(--accent);}
+  .empty{text-align:center; color:var(--muted); font-size:14px; padding:30px 10px;}
+
+  .modal-bg{display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:50; align-items:flex-end;}
+  .modal-bg.open{display:flex;}
+  .modal{
+    background:var(--card-2); border:1px solid var(--border); width:100%; max-width:520px; margin:0 auto;
+    border-radius:18px 18px 0 0; padding:20px 18px 26px; max-height:88vh; overflow-y:auto;
+    animation:slideUp .2s ease-out; color:var(--text);
+  }
+  @keyframes slideUp{from{transform:translateY(30px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+  .modal h2{margin:0 0 6px; font-size:17px; color:var(--text);}
+  .modal p.sub{font-size:13px; color:var(--muted); margin:0 0 14px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:13px; font-weight:600; color:var(--muted); margin-bottom:5px;}
+  .field input, .field textarea, .field select{
+    width:100%; padding:12px; border:1px solid var(--border-strong); border-radius:10px;
+    font-size:15px; background:var(--card); color:var(--text); font-family:inherit;
+  }
+  .field textarea{resize:vertical; min-height:60px;}
+  .modal-actions{display:flex; gap:10px; margin-top:6px;}
+  .btn{flex:1; padding:13px; border-radius:10px; border:none; font-size:15px; font-weight:700;}
+  .btn-primary{background:var(--primary); color:#fff;}
+  .btn-secondary{background:var(--card); color:var(--text); border:1px solid var(--border-strong);}
+
+  .setup-overlay{
+    position:fixed; inset:0; background:radial-gradient(circle at 30% 20%,#1a2338,var(--bg) 70%);
+    z-index:100; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:30px; color:#fff; text-align:center;
+  }
+  .setup-overlay .logo-mark{width:64px; height:64px; border-radius:16px; margin-bottom:18px;}
+  .setup-overlay h1{font-size:22px; margin-bottom:6px;}
+  .setup-overlay p{font-size:14px; color:var(--muted); margin-bottom:24px; max-width:320px;}
+  .setup-overlay input{
+    width:100%; max-width:300px; padding:14px; border-radius:10px; border:1px solid var(--border-strong);
+    background:var(--card); color:var(--text); font-size:15px; margin-bottom:14px; text-align:center;
+  }
+  .setup-overlay button{
+    width:100%; max-width:300px; padding:14px; border-radius:10px; border:none;
+    background:var(--primary); color:#fff; font-size:15px; font-weight:700;
+  }
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:var(--card-2); border:1px solid var(--border-strong); color:#fff; padding:10px 18px; border-radius:20px;
+    font-size:13px; z-index:60; opacity:0; pointer-events:none; transition:opacity .25s;
+    max-width:90%; text-align:center;
+  }
+  .toast.show{opacity:1;}
+  .config-warning{
+    background:rgba(244,63,94,.12); color:var(--danger); border:1px solid rgba(244,63,94,.3); border-radius:10px; padding:12px 14px;
+    font-size:13px; margin-bottom:14px; text-align:center;
+  }
+</style>
+</head>
+<body>
+
+<div class="setup-overlay" id="setupOverlay">
+  <img class="logo-mark" src="icon-192.png" alt="Distritodo">
+  <h1>Control de Horas Extras</h1>
+  <p>Ingresa tu nombre, tu punto de venta y crea un PIN de 4 dígitos para identificar tus registros.</p>
+  <input type="text" id="setupName" placeholder="Nombre completo" autocomplete="name">
+  <input type="text" id="setupPos" placeholder="Punto de venta / sucursal">
+  <input type="tel" id="setupPin" placeholder="PIN de 4 dígitos" maxlength="4" inputmode="numeric">
+  <button onclick="finishSetup()">Comenzar</button>
+</div>
+
+<header>
+  <div class="top-row">
+    <div class="brand">
+      <img class="logo-mark" src="icon-192.png" alt="Distritodo">
+      <div>
+        <h1>Horas Extras</h1>
+        <div class="app-sub">Distritodo</div>
+        <div class="emp-name" id="empNameLabel"></div>
+        <div class="emp-name" id="empPosLabel"></div>
+      </div>
+    </div>
+    <button class="icon-btn" onclick="openSettings()">⚙</button>
+  </div>
+</header>
+
+<main>
+  <div id="configWarning" class="config-warning" style="display:none;">
+    ⚠ Falta configurar la conexión a Supabase en config.js
+  </div>
+
+  <div class="summary">
+    <div class="card">
+      <div class="num" id="totalSemana">0.0</div>
+      <div class="lbl">Horas aprobadas<br>esta semana</div>
+    </div>
+    <div class="card">
+      <div class="num" id="totalMes">0.0</div>
+      <div class="lbl">Horas aprobadas<br>este mes</div>
+    </div>
+  </div>
+
+  <div class="turno-card">
+    <div class="estado-txt" id="turnoEstado">Sin turno de hora extra activo</div>
+    <div class="crono" id="crono" style="display:none;">00:00:00</div>
+    <button class="big-btn start" id="btnIniciar" onclick="iniciarTurno()">▶ Iniciar hora extra</button>
+    <button class="big-btn end" id="btnFinalizar" onclick="abrirFinalizar()" style="display:none;">■ Finalizar hora extra</button>
+    <div class="status-line" id="statusLine"></div>
+  </div>
+
+  <div class="section-title">Mis registros</div>
+  <div id="lista"></div>
+</main>
+
+<!-- Modal: finalizar turno (motivo) -->
+<div class="modal-bg" id="finModal">
+  <div class="modal">
+    <h2>Finalizar hora extra</h2>
+    <p class="sub">Se tomará tu ubicación y una foto como evidencia de cierre.</p>
+    <div class="field">
+      <label>Motivo de la hora extra *</label>
+      <select id="fMotivoCategoria">
+        <option value="">Selecciona un motivo…</option>
+        <option value="Cierre de caja">Cierre de caja</option>
+        <option value="Inventario">Inventario</option>
+        <option value="Pedido urgente">Pedido urgente</option>
+        <option value="Cobertura de turno">Cobertura de turno</option>
+        <option value="Otro">Otro</option>
+      </select>
+    </div>
+    <div class="field">
+      <label id="fMotivoDetalleLabel">Detalle (opcional)</label>
+      <textarea id="fMotivo" placeholder="Explica brevemente por qué se reporta esta hora extra..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeFinModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="finalizarTurno()">Confirmar y capturar evidencia</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="settingsModal">
+  <div class="modal">
+    <h2>Ajustes</h2>
+    <div class="field">
+      <label>Nombre del empleado</label>
+      <input type="text" id="settingsName">
+    </div>
+    <div class="field">
+      <label>Punto de venta / sucursal</label>
+      <input type="text" id="settingsPos">
+    </div>
+    <div class="field">
+      <label>PIN (4 dígitos)</label>
+      <input type="tel" id="settingsPin" maxlength="4" inputmode="numeric">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeSettings()">Cerrar</button>
+      <button class="btn btn-primary" onclick="guardarPerfil()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;">
+
+<div class="toast" id="toast"></div>
+
+<script>
+const cfg = window.APP_CONFIG || {};
+let supabase = null;
+if(cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && !cfg.SUPABASE_URL.includes('PEGA_AQUI')){
+  supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+} else {
+  document.addEventListener('DOMContentLoaded', ()=>{
+    document.getElementById('configWarning').style.display = 'block';
+  });
+}
+
+const NAME_KEY = 'oe_nombre';
+const PIN_KEY = 'oe_pin';
+const POS_KEY = 'oe_pos';
+const TURNO_KEY = 'oe_turno_activo_id';
+const TURNO_START_KEY = 'oe_turno_inicio';
+
+let nombre = localStorage.getItem(NAME_KEY) || '';
+let pin = localStorage.getItem(PIN_KEY) || '';
+let puntoVenta = localStorage.getItem(POS_KEY) || '';
+let turnoActivoId = localStorage.getItem(TURNO_KEY) || null;
+let cronoInterval = null;
+
+function actualizarHeader(){
+  document.getElementById('empNameLabel').textContent = nombre + ' · PIN ' + pin;
+  document.getElementById('empPosLabel').textContent = puntoVenta;
+}
+
+function init(){
+  if(!nombre || !pin || !puntoVenta){
+    document.getElementById('setupOverlay').style.display = 'flex';
+  } else {
+    document.getElementById('setupOverlay').style.display = 'none';
+    actualizarHeader();
+    cargarDatos();
+  }
+  document.getElementById('fMotivoCategoria').addEventListener('change', actualizarLabelDetalle);
+}
+
+function actualizarLabelDetalle(){
+  const cat = document.getElementById('fMotivoCategoria').value;
+  document.getElementById('fMotivoDetalleLabel').textContent = cat === 'Otro' ? 'Detalle (obligatorio)' : 'Detalle (opcional)';
+}
+
+function finishSetup(){
+  const val = document.getElementById('setupName').value.trim();
+  const posVal = document.getElementById('setupPos').value.trim();
+  const p = document.getElementById('setupPin').value.trim();
+  if(!val){ alert('Ingresa tu nombre'); return; }
+  if(!posVal){ alert('Ingresa tu punto de venta'); return; }
+  if(!/^\d{4}$/.test(p)){ alert('El PIN debe ser de 4 dígitos numéricos'); return; }
+  nombre = val; pin = p; puntoVenta = posVal;
+  localStorage.setItem(NAME_KEY, nombre);
+  localStorage.setItem(PIN_KEY, pin);
+  localStorage.setItem(POS_KEY, puntoVenta);
+  actualizarHeader();
+  document.getElementById('setupOverlay').style.display = 'none';
+  cargarDatos();
+}
+
+function openSettings(){
+  document.getElementById('settingsName').value = nombre;
+  document.getElementById('settingsPos').value = puntoVenta;
+  document.getElementById('settingsPin').value = pin;
+  document.getElementById('settingsModal').classList.add('open');
+}
+function closeSettings(){ document.getElementById('settingsModal').classList.remove('open'); }
+function guardarPerfil(){
+  const val = document.getElementById('settingsName').value.trim();
+  const posVal = document.getElementById('settingsPos').value.trim();
+  const p = document.getElementById('settingsPin').value.trim();
+  if(!val || !posVal || !/^\d{4}$/.test(p)){ alert('Nombre, punto de venta y PIN (4 dígitos) son obligatorios'); return; }
+  nombre = val; pin = p; puntoVenta = posVal;
+  localStorage.setItem(NAME_KEY, nombre);
+  localStorage.setItem(PIN_KEY, pin);
+  localStorage.setItem(POS_KEY, puntoVenta);
+  actualizarHeader();
+  closeSettings();
+  cargarDatos();
+  showToast('Perfil actualizado');
+}
+
+// ---------- Utilidades de evidencia ----------
+function getPosition(){
+  return new Promise((resolve, reject)=>{
+    if(!navigator.geolocation){ reject(new Error('Geolocalización no disponible')); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({lat: pos.coords.latitude, lng: pos.coords.longitude}),
+      err => reject(err),
+      {enableHighAccuracy:true, timeout:12000, maximumAge:0}
+    );
+  });
+}
+
+function capturePhoto(){
+  return new Promise((resolve, reject)=>{
+    const input = document.getElementById('cameraInput');
+    input.value = '';
+    const onChange = () => {
+      input.removeEventListener('change', onChange);
+      if(input.files && input.files[0]) resolve(input.files[0]);
+      else reject(new Error('No se tomó ninguna foto'));
+    };
+    input.addEventListener('change', onChange);
+    input.click();
+  });
+}
+
+async function uploadPhoto(file, path){
+  const { data, error } = await supabase.storage.from('evidencias').upload(path, file, { upsert:true, contentType: file.type || 'image/jpeg' });
+  if(error) throw error;
+  return data.path;
+}
+
+function setStatusLine(msg){ document.getElementById('statusLine').textContent = msg || ''; }
+
+// ---------- Iniciar turno ----------
+async function iniciarTurno(){
+  if(!supabase){ alert('Falta configurar Supabase (config.js)'); return; }
+  const btn = document.getElementById('btnIniciar');
+  btn.disabled = true;
+  try{
+    setStatusLine('Obteniendo ubicación…');
+    const pos = await getPosition();
+    setStatusLine('Abriendo cámara para foto de evidencia…');
+    const photo = await capturePhoto();
+    setStatusLine('Subiendo evidencia…');
+    const path = `${pin}/${Date.now()}_start.jpg`;
+    await uploadPhoto(photo, path);
+    setStatusLine('Guardando registro…');
+    const { data, error } = await supabase.from('overtime_entries').insert({
+      employee_name: nombre,
+      employee_pin: pin,
+      store_name: puntoVenta,
+      start_time: new Date().toISOString(),
+      start_lat: pos.lat,
+      start_lng: pos.lng,
+      start_photo_path: path,
+      status: 'en_curso'
+    }).select().single();
+    if(error) throw error;
+    turnoActivoId = data.id;
+    localStorage.setItem(TURNO_KEY, turnoActivoId);
+    localStorage.setItem(TURNO_START_KEY, data.start_time);
+    setStatusLine('');
+    showToast('Hora extra iniciada');
+    renderTurnoUI();
+  } catch(e){
+    console.error(e);
+    setStatusLine('');
+    alert('No se pudo iniciar: ' + (e.message || 'revisa permisos de ubicación/cámara e internet.'));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function abrirFinalizar(){
+  document.getElementById('fMotivoCategoria').value = '';
+  document.getElementById('fMotivo').value = '';
+  actualizarLabelDetalle();
+  document.getElementById('finModal').classList.add('open');
+}
+function closeFinModal(){ document.getElementById('finModal').classList.remove('open'); }
+
+async function finalizarTurno(){
+  if(!supabase){ alert('Falta configurar Supabase (config.js)'); return; }
+  const categoria = document.getElementById('fMotivoCategoria').value;
+  const motivo = document.getElementById('fMotivo').value.trim();
+  if(!categoria){ alert('Selecciona el motivo de la hora extra'); return; }
+  if(categoria === 'Otro' && !motivo){ alert('Escribe el detalle del motivo'); return; }
+  closeFinModal();
+  const btn = document.getElementById('btnFinalizar');
+  btn.disabled = true;
+  try{
+    setStatusLine('Obteniendo ubicación…');
+    const pos = await getPosition();
+    setStatusLine('Abriendo cámara para foto de evidencia…');
+    const photo = await capturePhoto();
+    setStatusLine('Subiendo evidencia…');
+    const path = `${pin}/${Date.now()}_end.jpg`;
+    await uploadPhoto(photo, path);
+    setStatusLine('Guardando registro…');
+
+    const inicio = new Date(localStorage.getItem(TURNO_START_KEY));
+    const fin = new Date();
+    const horas = Math.round(((fin - inicio) / 3600000) * 100) / 100;
+
+    const { error } = await supabase.from('overtime_entries').update({
+      end_time: fin.toISOString(),
+      end_lat: pos.lat,
+      end_lng: pos.lng,
+      end_photo_path: path,
+      reason_category: categoria,
+      reason: motivo,
+      hours: horas,
+      status: 'pendiente'
+    }).eq('id', turnoActivoId);
+    if(error) throw error;
+
+    turnoActivoId = null;
+    localStorage.removeItem(TURNO_KEY);
+    localStorage.removeItem(TURNO_START_KEY);
+    setStatusLine('');
+    showToast('Hora extra finalizada · pendiente de aprobación');
+    renderTurnoUI();
+    cargarDatos();
+  } catch(e){
+    console.error(e);
+    setStatusLine('');
+    alert('No se pudo finalizar: ' + (e.message || 'revisa permisos de ubicación/cámara e internet.'));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderTurnoUI(){
+  const btnIniciar = document.getElementById('btnIniciar');
+  const btnFinalizar = document.getElementById('btnFinalizar');
+  const crono = document.getElementById('crono');
+  const estado = document.getElementById('turnoEstado');
+  if(cronoInterval){ clearInterval(cronoInterval); cronoInterval = null; }
+
+  if(turnoActivoId){
+    btnIniciar.style.display = 'none';
+    btnFinalizar.style.display = 'block';
+    crono.style.display = 'block';
+    estado.textContent = 'Hora extra en curso';
+    const inicio = new Date(localStorage.getItem(TURNO_START_KEY));
+    const tick = () => {
+      const diff = Math.max(0, Date.now() - inicio.getTime());
+      const h = String(Math.floor(diff/3600000)).padStart(2,'0');
+      const m = String(Math.floor((diff%3600000)/60000)).padStart(2,'0');
+      const s = String(Math.floor((diff%60000)/1000)).padStart(2,'0');
+      crono.textContent = `${h}:${m}:${s}`;
+    };
+    tick();
+    cronoInterval = setInterval(tick, 1000);
+  } else {
+    btnIniciar.style.display = 'block';
+    btnFinalizar.style.display = 'none';
+    crono.style.display = 'none';
+    estado.textContent = 'Sin turno de hora extra activo';
+  }
+}
+
+// ---------- Cargar y renderizar registros ----------
+async function cargarDatos(){
+  if(!supabase) return;
+  renderTurnoUI();
+  const { data, error } = await supabase
+    .from('overtime_entries')
+    .select('*')
+    .eq('employee_name', nombre)
+    .eq('employee_pin', pin)
+    .order('start_time', {ascending:false})
+    .limit(40);
+  if(error){ console.error(error); return; }
+
+  // Si hay un turno en curso en la BD pero no en localStorage (ej. cambió de dispositivo), sincroniza
+  const enCurso = data.find(r => r.status === 'en_curso');
+  if(enCurso && !turnoActivoId){
+    turnoActivoId = enCurso.id;
+    localStorage.setItem(TURNO_KEY, turnoActivoId);
+    localStorage.setItem(TURNO_START_KEY, enCurso.start_time);
+    renderTurnoUI();
+  }
+
+  renderLista(data);
+  renderTotales(data);
+}
+
+function renderLista(data){
+  const lista = document.getElementById('lista');
+  lista.innerHTML = '';
+  const visibles = data.filter(r => r.status !== 'en_curso');
+  if(visibles.length === 0){
+    lista.innerHTML = '<div class="empty">Aún no tienes registros finalizados.</div>';
+    return;
+  }
+  visibles.forEach(r=>{
+    const div = document.createElement('div');
+    div.className = 'entry';
+    const fechaFmt = new Date(r.start_time).toLocaleDateString('es-ES', {weekday:'short', day:'2-digit', month:'short'});
+    const horaIni = new Date(r.start_time).toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'});
+    const horaFin = r.end_time ? new Date(r.end_time).toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'}) : '—';
+    const badgeTxt = {pendiente:'Pendiente revisión', aprobado:'Aprobado', rechazado:'Rechazado'}[r.status] || r.status;
+    const motivoTxt = [r.reason_category, r.reason].filter(Boolean).join(' · ');
+    div.innerHTML = `
+      <div class="top">
+        <div class="fecha">${fechaFmt}</div>
+        <div class="horas">${r.hours != null ? r.hours.toFixed(1) + ' h' : '—'}</div>
+      </div>
+      <div class="detalle">${horaIni} - ${horaFin}${motivoTxt ? ' · ' + motivoTxt : ''}</div>
+      <span class="badge ${r.status}">${badgeTxt}${r.status==='rechazado' && r.rejection_note ? ': ' + r.rejection_note : ''}</span>
+    `;
+    lista.appendChild(div);
+  });
+}
+
+function renderTotales(data){
+  const now = new Date();
+  const day = now.getDay() || 7;
+  const monday = new Date(now); monday.setDate(now.getDate()-day+1); monday.setHours(0,0,0,0);
+  const sunday = new Date(monday); sunday.setDate(monday.getDate()+6); sunday.setHours(23,59,59,999);
+
+  let totalSemana = 0, totalMes = 0;
+  data.forEach(r=>{
+    if(r.status !== 'aprobado' || !r.hours) return;
+    const d = new Date(r.start_time);
+    if(d >= monday && d <= sunday) totalSemana += r.hours;
+    if(d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) totalMes += r.hours;
+  });
+  document.getElementById('totalSemana').textContent = totalSemana.toFixed(1);
+  document.getElementById('totalMes').textContent = totalMes.toFixed(1);
+}
+
+let toastTimer;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2500);
+}
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+
+init();
+</script>
+</body>
+</html>
